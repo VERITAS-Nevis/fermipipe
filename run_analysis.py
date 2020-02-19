@@ -13,7 +13,8 @@ def run_analysis(fermipy_config, prefix):
     # Set the outdir to be the same as the prefix
     if 'fileio' not in config:
         config['fileio'] = {}
-    config['fileio']['outdir'] = prefix
+    if 'outdir' not in config['fileio']:
+        config['fileio']['outdir'] = prefix
 
     gta = GTAnalysis(config, logging={'verbosity': 3})
 
