@@ -1,0 +1,39 @@
+data:
+    evfile: '/a/data/tehanu/qifeng/allsky-fermi/data/evlist'
+    scfile: '/a/data/tehanu/qifeng/allsky-fermi/data/spacecraft/lat_spacecraft_merged.fits'
+
+binning:
+    roiwidth: 15.0
+    binsz: 0.1
+    binsperdec: 8
+
+selection:
+    tmin: ADD ME!
+    tmax: ADD ME!
+    target: ADD ME!
+    emin: 100
+    emax: 500000
+    zmax: 90
+    evclass: 128
+    evtype: 3
+    filter: 'DATA_QUAL>0 && LAT_CONFIG==1'
+    roicut: 'no'
+
+gtlike:
+    edisp: true
+    irfs: 'P8R3_SOURCE_V2'
+
+lightcurve:
+    use_scaled_srcmap: true
+
+model:
+    src_roiwidth: 20.0
+    galdiff: '$CONDA_PREFIX/share/fermitools/refdata/fermi/galdiffuse/gll_iem_v07.fits'
+    isodiff: 'iso_P8R3_SOURCE_V2_v1.txt'
+    catalogs: ['4FGL']
+
+optimizer:
+    optimizer: NEWMINUIT
+
+extension:
+    make_plots: True

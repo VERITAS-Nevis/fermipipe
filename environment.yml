@@ -1,0 +1,9 @@
+name: fermi
+channels:
+    - conda-forge/label/cf201901
+    - conda-forge
+    - fermi
+dependencies:
+    - fermitools
+    - fermipy>=0.17.4
+    - jupyter
