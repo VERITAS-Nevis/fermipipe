@@ -3,26 +3,26 @@ import yaml
 
 from fermipy.gtanalysis import GTAnalysis
 
-def run_analysis(fermipy_config, prefix):
+def run_analysis(fermipy_config, prefix, multithread, nthread):
+    """
+    Run a Fermipy analysis.
 
-    # Load FermiPy config file
-    with open(fermipy_config, 'r') as config_file:
-        config = yaml.safe_load(config_file)
-    source_name = config['selection']['target']
+    Arguments:
+        fermipy_config -- path to Fermipy config file
+        prefix -- prefix for output files and output directory
+        multithread -- whether to split the calculation across multiple threads
+                       for the TS map calculation
+        nthread -- if multithreading, number of threads to use.
+                   if None, create one process for each available core.
+    """
 
-    # Set the outdir to be the same as the prefix
-    if 'fileio' not in config:
-        config['fileio'] = {}
-    if 'outdir' not in config['fileio']:
-        config['fileio']['outdir'] = prefix
-
-    gta = GTAnalysis(config, logging={'verbosity': 3})
+    gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
 
     # Prepare the data and perform calculations needed for the analysis
     gta.setup()
 
-    # Fit the normalization and spectral shape parameters of all model components
-    # and compute the TS of all sources in the ROI
+    # Fit the normalization and spectral shape parameters
+    # of all model components and compute the TS of all sources in the ROI
     gta.optimize()
 
     # Remove undetected sources (TS < 1) to simplify the model
@@ -40,29 +40,69 @@ def run_analysis(fermipy_config, prefix):
     gta.fit()
     gta.free_sources(free=False)
 
-    # Save the results so they can be loaded later
-    gta.write_roi(prefix, make_plots=True)
-
     # Plot TS and residual maps
     model = {
         'SpatialModel': 'PointSource',
         'Index': 2.5,
         'SpectrumType': 'PowerLaw'
         }
-    tsmap = gta.tsmap(prefix, model=model, make_plots=True)
+    tsmap = gta.tsmap(prefix, model=model, multithread=multithread,
+                      nthread=nthread, make_plots=True)
     resmap = gta.residmap(prefix, model=model, make_plots=True)
 
     # Calculate the spectral energy distribution
-    sed = gta.sed(source_name, make_plots=True)
+    sed = gta.sed(fermipy_config['selection']['target'], make_plots=True)
+
+    # Save the results so they can be loaded later
+    gta.write_roi(prefix, make_plots=True)
+
+
+def run_lightcurve(fermipy_config, prefix, multithread, nthread, **kwargs):
+    """
+    Run a Fermipy lightcurve analysis.
+
+    Arguments:
+        fermipy_config -- path to Fermipy config file
+        prefix -- prefix for output files and output directory
+        multithread -- whether to split the calculation across multiple threads
+                       for the lightcurve calculation
+        nthread -- if multithreading, number of threads to use.
+                   if None, create one process for each available core.
+    """
+    gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
+    gta.load_roi('{}.npy'.format(prefix))
+    gta.lightcurve(fermipy_config['selection']['target'],
+                   multithread=multithread, nthread=nthread,
+                   make_plots=True)
+
 
 if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run a Fermipy analysis.")
     parser.add_argument('config', help="path to pipeline configuration file")
+    parser.add_argument('--lightcurve', action='store_true',
+                        help="perform a lightcurve analysis")
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
         pipeline_config = yaml.safe_load(config_file)
 
-    run_analysis(**pipeline_config)
+    # Load pipeline configuration
+    with open(pipeline_config['fermipy_config'], 'r') as config_file:
+        fermipy_config = yaml.safe_load(config_file)
+    prefix = pipeline_config['prefix']
+    multithread = pipeline_config['multithread']
+    nthread = pipeline_config['nthread']
+
+    # Set the outdir to be the same as the prefix
+    if 'fileio' not in fermipy_config:
+        fermipy_config['fileio'] = {}
+    if 'outdir' not in fermipy_config['fileio']:
+        fermipy_config['fileio']['outdir'] = prefix
+
+    run_analysis(fermipy_config, prefix, multithread, nthread)
+
+    if args.lightcurve:
+        run_lightcurve(fermipy_config, prefix, multithread, nthread,
+                       **pipeline_config['lightcurve'])

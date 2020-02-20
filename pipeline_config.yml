@@ -1,2 +1,8 @@
+# Basic analysis parameters
 fermipy_config: config.yml
 prefix: "3C279"
+multithread: false
+nthread: null
+
+# Lightcurve analysis parameters
+lightcurve: {}
