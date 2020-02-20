@@ -3,17 +3,13 @@ import yaml
 
 from fermipy.gtanalysis import GTAnalysis
 
-def run_analysis(fermipy_config, prefix, multithread, nthread):
+def run_analysis(fermipy_config, prefix):
     """
     Run a Fermipy analysis.
 
     Arguments:
         fermipy_config -- path to Fermipy config file
         prefix -- prefix for output files and output directory
-        multithread -- whether to split the calculation across multiple threads
-                       for the TS map calculation
-        nthread -- if multithreading, number of threads to use.
-                   if None, create one process for each available core.
     """
 
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
@@ -46,8 +42,7 @@ def run_analysis(fermipy_config, prefix, multithread, nthread):
         'Index': 2.5,
         'SpectrumType': 'PowerLaw'
         }
-    tsmap = gta.tsmap(prefix, model=model, multithread=multithread,
-                      nthread=nthread, make_plots=True)
+    tsmap = gta.tsmap(prefix, model=model, make_plots=True)
     resmap = gta.residmap(prefix, model=model, make_plots=True)
 
     # Calculate the spectral energy distribution
@@ -57,22 +52,17 @@ def run_analysis(fermipy_config, prefix, multithread, nthread):
     gta.write_roi(prefix, make_plots=True)
 
 
-def run_lightcurve(fermipy_config, prefix, multithread, nthread, **kwargs):
+def run_lightcurve(fermipy_config, prefix, **kwargs):
     """
     Run a Fermipy lightcurve analysis.
 
     Arguments:
         fermipy_config -- path to Fermipy config file
         prefix -- prefix for output files and output directory
-        multithread -- whether to split the calculation across multiple threads
-                       for the lightcurve calculation
-        nthread -- if multithreading, number of threads to use.
-                   if None, create one process for each available core.
     """
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
     gta.load_roi('{}.npy'.format(prefix))
     gta.lightcurve(fermipy_config['selection']['target'],
-                   multithread=multithread, nthread=nthread,
                    make_plots=True)
 
 
@@ -92,8 +82,6 @@ if __name__ == "__main__":
     with open(pipeline_config['fermipy_config'], 'r') as config_file:
         fermipy_config = yaml.safe_load(config_file)
     prefix = pipeline_config['prefix']
-    multithread = pipeline_config['multithread']
-    nthread = pipeline_config['nthread']
 
     # Set the outdir to be the same as the prefix
     if 'fileio' not in fermipy_config:
@@ -101,8 +89,7 @@ if __name__ == "__main__":
     if 'outdir' not in fermipy_config['fileio']:
         fermipy_config['fileio']['outdir'] = prefix
 
-    run_analysis(fermipy_config, prefix, multithread, nthread)
+    run_analysis(fermipy_config, prefix)
 
     if args.lightcurve:
-        run_lightcurve(fermipy_config, prefix, multithread, nthread,
-                       **pipeline_config['lightcurve'])
+        run_lightcurve(fermipy_config, prefix **pipeline_config['lightcurve'])
