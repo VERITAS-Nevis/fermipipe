@@ -5,4 +5,5 @@ multithread: false
 nthread: null
 
 # Lightcurve analysis parameters
-lightcurve: {}
+num_sections: null
+section: 0

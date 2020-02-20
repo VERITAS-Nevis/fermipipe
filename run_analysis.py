@@ -1,7 +1,10 @@
 import argparse
-import yaml
+import glob
+import os
 
 from fermipy.gtanalysis import GTAnalysis
+import numpy as np
+import yaml
 
 def run_analysis(fermipy_config, prefix):
     """
@@ -52,18 +55,68 @@ def run_analysis(fermipy_config, prefix):
     gta.write_roi(prefix, make_plots=True)
 
 
-def run_lightcurve(fermipy_config, prefix, **kwargs):
+def get_times(fermipy_config):
+    """
+    Calculate sequence of time bins as defined in Fermipy.
+
+    https://github.com/fermiPy/fermipy/blob/master/fermipy/lightcurve.py
+    """
+
+    tmin = fermipy_config['selection']['tmin']
+    tmax = fermipy_config['selection']['tmax']
+    lc_config = fermipy_config['lightcurve']
+
+    # Make array of time values in MET
+    if lc_config.get('time_bins'):
+        times = np.array(lc_config['time_bins'])
+    elif lc_config.get('nbins'):
+        times = np.linspace(tmin, tmax, lc_config['nbins'] + 1)
+    elif lc_config.get('binsz'):
+        times = np.arange(tmin, tmax, lc_config['binsz'])
+    else:
+        raise ValueError("None of time_bins, nbins, or binsz specified")
+    return times
+
+
+def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
     """
     Run a Fermipy lightcurve analysis.
 
     Arguments:
         fermipy_config -- path to Fermipy config file
         prefix -- prefix for output files and output directory
+        num_sections -- number of sections to split the lightcurve into
+                        to compartmentalize the calculation when it crashes
+                        if None, do not section the analysis
+        section -- the section index to perform the analysis for
     """
+
+    # Split the lightcurve into sections
+    if num_sections is not None:
+        times = get_times(fermipy_config)
+        split_times = np.array_split(times, num_sections)
+        selected_times = split_times[section]
+        # Prevent the last bin from being lost due to the split
+        if section < num_sections - 1:
+            next_section_times = split_times[section + 1]
+            if next_section_times.size != 0:
+                last_bin = next_section_times[0]
+                selected_times = np.append(selected_times, last_bin)
+        selected_times = selected_times.tolist()
+        fermipy_config['lightcurve']['time_bins'] = selected_times
+
+    # Perform the analysis (on the selected section)
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
     gta.load_roi('{}.npy'.format(prefix))
-    gta.lightcurve(fermipy_config['selection']['target'],
-                   make_plots=True)
+    gta.lightcurve(fermipy_config['selection']['target'], make_plots=True)
+
+    # Rename output file to prevent sections from overwriting each other
+    outdir = fermipy_config['fileio']['outdir']
+    outfiles = glob.glob(os.path.join(outdir, "*_lightcurve.*"))
+    for outfile in outfiles:
+        ext = outfile.rsplit('.', 1)[1]
+        os.rename(outfile, os.path.join(outdir,
+            "{}_lightcurve_{}.{}".format(prefix, section, ext)))
 
 
 if __name__ == "__main__":
@@ -89,7 +142,10 @@ if __name__ == "__main__":
     if 'outdir' not in fermipy_config['fileio']:
         fermipy_config['fileio']['outdir'] = prefix
 
-    run_analysis(fermipy_config, prefix)
-
     if args.lightcurve:
-        run_lightcurve(fermipy_config, prefix **pipeline_config['lightcurve'])
+        num_sections = pipeline_config['num_sections']
+        section = pipeline_config['section']
+        run_lightcurve(fermipy_config, prefix, num_sections, section)
+    else:
+        run_analysis(fermipy_config, prefix)
+
