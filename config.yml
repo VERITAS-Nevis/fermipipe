@@ -27,7 +27,7 @@ lightcurve:
     use_scaled_srcmap: true
 
 model:
-    src_roiwidth: 20.0
+    src_roiwidth: 30.0
     galdiff: '$CONDA_PREFIX/share/fermitools/refdata/fermi/galdiffuse/gll_iem_v07.fits'
     isodiff: 'iso_P8R3_SOURCE_V2_v1.txt'
     catalogs: ['4FGL']

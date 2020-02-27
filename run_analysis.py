@@ -24,12 +24,17 @@ def run_analysis(fermipy_config, prefix):
     # of all model components and compute the TS of all sources in the ROI
     gta.optimize()
 
-    # Remove undetected sources (TS < 1) to simplify the model
-    gta.delete_sources(minmax_ts=[None, 1], exclude=['galdiff', 'isodiff'])
+    gta.print_roi()
 
-    # Free the normalization of high TS sources and those close to the ROI center
-    gta.free_sources(minmax_ts=[10, None], pars='norm')
-    gta.free_sources(distance=3.0, pars='norm')
+    # Remove undetected sources to simplify the model
+    gta.delete_sources(minmax_ts=[None, 4], exclude=['galdiff', 'isodiff'])
+    gta.delete_sources(minmax_npred=[None, 1], exclude=['galdiff', 'isodiff'])
+
+    gta.print_roi()
+
+    # Free high TS sources and those close to the ROI center
+    gta.free_sources(minmax_ts=[25, None])
+    gta.free_sources(distance=5.0)
 
     # Free all parameters of the galactic and isotropic diffuse components
     gta.free_source('galdiff')
@@ -39,10 +44,12 @@ def run_analysis(fermipy_config, prefix):
     gta.fit()
     gta.free_sources(free=False)
 
+    gta.print_roi()
+
     # Plot TS and residual maps
     model = {
         'SpatialModel': 'PointSource',
-        'Index': 2.5,
+        'Index': 2.0,
         'SpectrumType': 'PowerLaw'
         }
     tsmap = gta.tsmap(prefix, model=model, make_plots=True)
@@ -124,17 +131,23 @@ if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run a Fermipy analysis.")
     parser.add_argument('config', help="path to pipeline configuration file")
-    parser.add_argument('--lightcurve', action='store_true',
+    parser.add_argument('-p', '--prefix',
+                        help="analysis prefix (overrides config)")
+    parser.add_argument('-l', '--lightcurve', action='store_true',
                         help="perform a lightcurve analysis")
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
         pipeline_config = yaml.safe_load(config_file)
+    prefix = args.prefix if args.prefix else pipeline_config['prefix']
 
-    # Load pipeline configuration
+    # Set the Fermipy config filename to a default if not otherwise specified
+    if not pipeline_config.get('fermipy_config'):
+        pipeline_config['fermipy_config'] = prefix + '_config.yml'
+
+    # Load Fermipy configuration
     with open(pipeline_config['fermipy_config'], 'r') as config_file:
         fermipy_config = yaml.safe_load(config_file)
-    prefix = pipeline_config['prefix']
 
     # Set the outdir to be the same as the prefix
     if 'fileio' not in fermipy_config:

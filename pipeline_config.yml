@@ -1,6 +1,6 @@
 # Basic analysis parameters
-fermipy_config: config.yml
 prefix: "3C279"
+fermipy_config: null  #  If null, default to <prefix>_config.yml
 multithread: false
 nthread: null
 
