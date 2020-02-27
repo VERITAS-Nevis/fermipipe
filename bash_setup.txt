@@ -1,0 +1,8 @@
+
+# Fermipy pipeline
+export FERMI_ANALYSIS_DIR=/a/data/tehanu/$USER/fermi_analysis
+export FERMIPIPE=/a/home/tehanu/brill/fermipipe
+alias fermisetup="source $FERMIPIPE/setup_fermi.sh"
+alias fermianalysis="nohup python $FERMIPIPE/run_analysis.py $FERMI_ANALYSIS_DIR/pipeline_config.yml &"
+source $FERMIPIPE/conda_init.txt
+
