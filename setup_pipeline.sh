@@ -1,6 +1,5 @@
 #!/bin/bash
 
-PIPELINE_DIR=/a/home/tehanu/brill/fermi_pipeline
 CONDA_DIR=/a/data/tehanu/$USER/miniconda3
 
 dry_run=0
@@ -23,18 +22,23 @@ done
 
 if [[ $dry_run == 1 ]]
 then
-    echo "$PIPELINE_DIR/miniconda3.sh -b -p $CONDA_DIR"
+    echo "$FERMIPIPE/miniconda3.sh -b -p $CONDA_DIR"
     exit 0
 fi
 
 # Set up the conda environment manager
-bash $PIPELINE_DIR/Miniconda3-4.7.12.1-Linux-x86_64.sh -b -p $CONDA_DIR
+bash $FERMIPIPE/Miniconda3-4.7.12.1-Linux-x86_64.sh -b -p $CONDA_DIR
 source $CONDA_DIR/bin/activate
+
+# Save the initialization text for other users to copy into their .bashrc
+conda init -v -d | grep "^+" | grep -v "^+++" | cut -c2- > $FERMIPIPE/conda_init.txt
+
+# Initialize conda
 conda init
 source ~/.bashrc
 conda config --set auto_activate_base false
 
 # Download and install the Fermitools and Fermipy
-conda env create -f $PIPELINE_DIR/environment.yml
+conda env create -f $FERMIPIPE/environment.yml
 
 exit 0
