@@ -1,6 +1,8 @@
 import argparse
 import glob
 import os
+import shutil
+import time
 
 from fermipy.gtanalysis import GTAnalysis
 import numpy as np
@@ -97,8 +99,10 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
                         if None, do not section the analysis
         section -- the section index to perform the analysis for
     """
+    outdir = os.path.join(os.getcwd(), fermipy_config['fileio']['outdir'])
 
     # Split the lightcurve into sections
+    selected_times = None
     if num_sections is not None:
         times = get_times(fermipy_config)
         split_times = np.array_split(times, num_sections)
@@ -114,11 +118,43 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
 
     # Perform the analysis (on the selected section)
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
-    gta.load_roi('{}.npy'.format(prefix))
-    gta.lightcurve(fermipy_config['selection']['target'], make_plots=True)
+
+    for __ in range(3):
+        try:
+            gta.load_roi('{}.npy'.format(prefix))
+            break
+        except RuntimeError:
+            # Maybe the file is in use? Wait, then try again
+            time.sleep(5)
+
+    try:
+        gta.lightcurve(fermipy_config['selection']['target'], make_plots=True)
+    except (IOError, OSError, RuntimeError, TypeError):
+        # There is a missing or corrupt file in the directory for a bin
+        # Delete the directory of the last bin to enable a clean restart
+        bin_dirs = glob.glob(os.path.join(outdir, "lightcurve_*"))
+
+        def selected(bin_dir):
+            bin_edges = bin_dir.split('/')[-1].split('_')[1:]
+            if selected_times is None:
+                return True
+            for edge in bin_edges:
+                if int(edge) not in selected_times:
+                    return False
+            return True
+
+        selected_bin_dirs= [bin_dir for bin_dir in bin_dirs
+                            if selected(bin_dir)]
+        last_bin_dir = sorted(selected_bin_dirs)[-1]
+        print("Removing corrupted directory {} ...".format(last_bin_dir))
+        shutil.rmtree(last_bin_dir)
+
+        # Restart the lightcurve analysis
+        print("Restarting the lightcurve analysis...")
+        run_lightcurve(fermipy_config, prefix, num_sections, section)
+        return
 
     # Rename output file to prevent sections from overwriting each other
-    outdir = fermipy_config['fileio']['outdir']
     outfiles = glob.glob(os.path.join(outdir, "*_lightcurve.*"))
     for outfile in outfiles:
         ext = outfile.rsplit('.', 1)[1]
@@ -135,6 +171,8 @@ if __name__ == "__main__":
                         help="analysis prefix (overrides config)")
     parser.add_argument('-l', '--lightcurve', action='store_true',
                         help="perform a lightcurve analysis")
+    parser.add_argument('-s', '--section', type=int,
+                        help="lightcurve section (overrides config)")
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
@@ -157,7 +195,7 @@ if __name__ == "__main__":
 
     if args.lightcurve:
         num_sections = pipeline_config['num_sections']
-        section = pipeline_config['section']
+        section = args.section if args.section else pipeline_config['section']
         run_lightcurve(fermipy_config, prefix, num_sections, section)
     else:
         run_analysis(fermipy_config, prefix)
