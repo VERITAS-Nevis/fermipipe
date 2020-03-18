@@ -1,9 +1,11 @@
 import argparse
+import copy
 import glob
 import os
 import shutil
 import time
 
+from astropy.io.fits.verify import VerifyError
 from fermipy.gtanalysis import GTAnalysis
 import numpy as np
 import yaml
@@ -100,11 +102,12 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
         section -- the section index to perform the analysis for
     """
     outdir = os.path.join(os.getcwd(), fermipy_config['fileio']['outdir'])
+    original_config = copy.deepcopy(fermipy_config)
 
-    # Split the lightcurve into sections
-    selected_times = None
-    if num_sections is not None:
-        times = get_times(fermipy_config)
+    times = get_times(fermipy_config)
+    if num_sections is None:
+        selected_times = times
+    else:  # Split the lightcurve into sections
         split_times = np.array_split(times, num_sections)
         selected_times = split_times[section]
         # Prevent the last bin from being lost due to the split
@@ -113,8 +116,33 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
             if next_section_times.size != 0:
                 last_bin = next_section_times[0]
                 selected_times = np.append(selected_times, last_bin)
-        selected_times = selected_times.tolist()
-        fermipy_config['lightcurve']['time_bins'] = selected_times
+
+    # Consolidate bins encompassed by non-science periods
+    # Otherwise, analysis will encounter a divide by zero error and segfault
+
+    # https://fermi.gsfc.nasa.gov/ssc/observations/timeline/posting/cal/
+    non_science_periods = {
+        (586362562, 586479265),
+        (542869922, 543857229),
+        (258507868, 258671110),
+        }
+
+    for period_start, period_end in non_science_periods:
+        # Get the bins encompassed by each non-science period
+        period_times = selected_times[(selected_times >= period_start)
+                                      & (selected_times <= period_end)]
+        if period_times.size == 0:
+            continue
+        # Remove the encompassed bins
+        # Note that this doesn't guarantee that the resulting merged bin
+        # has sufficient exposure, and that data may be thrown out
+        # if the non-science period was at the start or end of the lightcurve
+        selected_times = np.setdiff1d(selected_times, period_times,
+                                      assume_unique=True)
+
+    selected_times = selected_times.tolist()
+    print("Time bins:", selected_times)
+    fermipy_config['lightcurve']['time_bins'] = selected_times
 
     # Perform the analysis (on the selected section)
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
@@ -129,15 +157,32 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
 
     try:
         gta.lightcurve(fermipy_config['selection']['target'], make_plots=True)
-    except (IOError, OSError, RuntimeError, TypeError):
+    except (AttributeError, IOError, OSError, RuntimeError, TypeError,
+            VerifyError) as err:
+
+        if type(err) == RuntimeError:
+            print(str(err))
+            allowed_runtime_error_starts = [
+                "File not in FITS or Root format",
+                "Requested energy",
+                "Could not open FITS extension",
+                "Failed to converge after",
+                "File not found",
+                ]
+            allowed_start = False
+            for start in allowed_runtime_error_starts:
+                if str(err).startswith(start):
+                    allowed_start = True
+            if not allowed_start:
+                raise err
+
         # There is a missing or corrupt file in the directory for a bin
         # Delete the directory of the last bin to enable a clean restart
         bin_dirs = glob.glob(os.path.join(outdir, "lightcurve_*"))
+        print("selected_times:", selected_times)
 
         def selected(bin_dir):
             bin_edges = bin_dir.split('/')[-1].split('_')[1:]
-            if selected_times is None:
-                return True
             for edge in bin_edges:
                 if int(edge) not in selected_times:
                     return False
@@ -145,14 +190,14 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
 
         selected_bin_dirs= [bin_dir for bin_dir in bin_dirs
                             if selected(bin_dir)]
-        last_bin_dir = sorted(selected_bin_dirs)[-1]
+        # Remove the last modified directory
+        last_bin_dir = max(selected_bin_dirs, key=os.path.getmtime)
         print("Removing corrupted directory {} ...".format(last_bin_dir))
         shutil.rmtree(last_bin_dir)
 
         # Restart the lightcurve analysis
         print("Restarting the lightcurve analysis...")
-        run_lightcurve(fermipy_config, prefix, num_sections, section)
-        return
+        return run_lightcurve(original_config, prefix, num_sections, section)
 
     # Rename output file to prevent sections from overwriting each other
     outfiles = glob.glob(os.path.join(outdir, "*_lightcurve.*"))
