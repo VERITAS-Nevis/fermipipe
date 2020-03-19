@@ -25,6 +25,7 @@ gtlike:
 
 lightcurve:
     use_scaled_srcmap: true
+    binsz: 604800  # 7 day bins in seconds; or set nbins or time_bins
 
 model:
     src_roiwidth: 30.0
