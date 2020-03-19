@@ -117,18 +117,29 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
                 last_bin = next_section_times[0]
                 selected_times = np.append(selected_times, last_bin)
 
-    # Consolidate bins encompassed by non-science periods
+    # Consolidate bins encompassed by periods with no data
+    # such as non-science periods or ToOs
     # Otherwise, analysis will encounter a divide by zero error and segfault
 
     # https://fermi.gsfc.nasa.gov/ssc/observations/timeline/posting/cal/
-    non_science_periods = {
-        (586362562, 586479265),
-        (542869922, 543857229),
-        (258507868, 258671110),
+    no_data_periods = {
+        (586362562, 586479265),  # Non-science Sunpoint
+        (557887205, 558482705),  # Extended south (+50) rock
+        (556044185, 556770005),  # Extended south (+50) rock
+        (542869922, 544544525),  # Spacecraft operational anomaly and recovery
+        (491961604, 492389764),  # ToO PSR J1119
+        (415063383, 415324023),  # Solar ToO
+        (407981463, 408414003),  # ToO Nova Cen
+        (258507868, 258671110),  # Non-science Unknown
         }
 
-    for period_start, period_end in non_science_periods:
-        # Get the bins encompassed by each non-science period
+    for period_start, period_end in no_data_periods:
+        # If there's only a few hours of data, the fit will likely fail
+        # Add a margin of error to avoid this
+        margin_of_error = 10800  # 3 hours
+        period_start -= margin_of_error
+        period_end += margin_of_error
+        # Get the bins encompassed by each no-data period
         period_times = selected_times[(selected_times >= period_start)
                                       & (selected_times <= period_end)]
         if period_times.size == 0:
@@ -240,7 +251,8 @@ if __name__ == "__main__":
 
     if args.lightcurve:
         num_sections = pipeline_config['num_sections']
-        section = args.section if args.section else pipeline_config['section']
+        section = (args.section if args.section is not None
+                   else pipeline_config['section'])
         run_lightcurve(fermipy_config, prefix, num_sections, section)
     else:
         run_analysis(fermipy_config, prefix)
