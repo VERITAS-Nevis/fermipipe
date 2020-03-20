@@ -124,9 +124,15 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
     # https://fermi.gsfc.nasa.gov/ssc/observations/timeline/posting/cal/
     no_data_periods = {
         (586362562, 586479265),  # Non-science Sunpoint
+        (560543825, 562120025),  # Extended south (+50) rock
         (557887205, 558482705),  # Extended south (+50) rock
         (556044185, 556770005),  # Extended south (+50) rock
-        (542869922, 544544525),  # Spacecraft operational anomaly and recovery
+        (554261765, 554843765),  # Extended south (+50) rock
+        (551667365, 552502385),  # Extended south (+50) rock
+        (550290005, 551107805),  # Extended south (+50) rock
+        (547923665, 548557805),  # Extended south (+50) rock
+        (542869922, 546791705),  # Spacecraft operational anomaly, recovery,
+                                 # and extended south (+50) rock
         (491961604, 492389764),  # ToO PSR J1119
         (415063383, 415324023),  # Solar ToO
         (407981463, 408414003),  # ToO Nova Cen
