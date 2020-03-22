@@ -217,11 +217,12 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
         return run_lightcurve(original_config, prefix, num_sections, section)
 
     # Rename output file to prevent sections from overwriting each other
-    outfiles = glob.glob(os.path.join(outdir, "*_lightcurve.*"))
-    for outfile in outfiles:
-        ext = outfile.rsplit('.', 1)[1]
-        os.rename(outfile, os.path.join(outdir,
-            "{}_lightcurve_{}.{}".format(prefix, section, ext)))
+    if num_sections is not None:
+        outfiles = glob.glob(os.path.join(outdir, "*_lightcurve.*"))
+        for outfile in outfiles:
+            ext = outfile.rsplit('.', 1)[1]
+            os.rename(outfile, os.path.join(outdir,
+                "{}_lightcurve_{}.{}".format(prefix, section, ext)))
 
 
 if __name__ == "__main__":
