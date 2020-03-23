@@ -10,7 +10,7 @@ from fermipy.gtanalysis import GTAnalysis
 import numpy as np
 import yaml
 
-def run_analysis(fermipy_config, prefix):
+def run_analysis(fermipy_config, prefix, calculate_sed=True):
     """
     Run a Fermipy analysis.
 
@@ -60,7 +60,8 @@ def run_analysis(fermipy_config, prefix):
     resmap = gta.residmap(prefix, model=model, make_plots=True)
 
     # Calculate the spectral energy distribution
-    sed = gta.sed(fermipy_config['selection']['target'], make_plots=True)
+    if calculate_sed:
+        sed = gta.sed(fermipy_config['selection']['target'], make_plots=True)
 
     # Save the results so they can be loaded later
     gta.write_roi(prefix, make_plots=True)
@@ -236,6 +237,8 @@ if __name__ == "__main__":
                         help="perform a lightcurve analysis")
     parser.add_argument('-s', '--section', type=int,
                         help="lightcurve section (overrides config)")
+    parser.add_argument('--no_sed', action='store_true',
+                        help="do not perform an SED analysis")
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
@@ -262,5 +265,7 @@ if __name__ == "__main__":
                    else pipeline_config['section'])
         run_lightcurve(fermipy_config, prefix, num_sections, section)
     else:
-        run_analysis(fermipy_config, prefix)
+        calculate_sed = (False if args.no_sed
+                         else pipeline_config.get('calculate_sed', True))
+        run_analysis(fermipy_config, prefix, calculate_sed=calculate_sed)
 

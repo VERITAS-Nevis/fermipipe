@@ -3,6 +3,7 @@ prefix: "3C279"
 fermipy_config: null  #  If null, default to <prefix>_config.yml
 multithread: false
 nthread: null
+calculate_sed: true
 
 # Lightcurve analysis parameters
 num_sections: null
