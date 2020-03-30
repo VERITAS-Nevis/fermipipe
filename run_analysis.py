@@ -154,6 +154,9 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0,
         dist_events = RAD_TO_DEG * angular_distance(pointing_ra, pointing_dec,
                                                     event_ra, event_dec)
 
+        # Consider only events within 50 degrees of the telescope Z-direction
+        # Chosen to roughly match time bins previously chosen manually,
+        # through trial and error
         time_met = time_met[dist_events < 50]
         starts = time_met[:-1]
         stops = time_met[1:]
