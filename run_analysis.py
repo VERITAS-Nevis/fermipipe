@@ -5,10 +5,11 @@ import os
 import shutil
 import time
 
-from astropy.io.fits.verify import VerifyError
+from astropy.io import fits
 from fermipy.gtanalysis import GTAnalysis
 import numpy as np
 import yaml
+
 
 def run_analysis(fermipy_config, prefix, calculate_sed=True):
     """
@@ -89,8 +90,8 @@ def get_times(fermipy_config):
         raise ValueError("None of time_bins, nbins, or binsz specified")
     return times
 
-
-def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
+def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0,
+                   no_data_periods=None):
     """
     Run a Fermipy lightcurve analysis.
 
@@ -121,31 +122,51 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
     # Consolidate bins encompassed by periods with no data
     # such as non-science periods or ToOs
     # Otherwise, analysis will encounter a divide by zero error and segfault
+    def get_no_data_periods():
 
-    # https://fermi.gsfc.nasa.gov/ssc/observations/timeline/posting/cal/
-    no_data_periods = {
-        (586362562, 586479265),  # Non-science Sunpoint
-        (560543825, 562120025),  # Extended south (+50) rock
-        (557887205, 558482705),  # Extended south (+50) rock
-        (556044185, 556770005),  # Extended south (+50) rock
-        (554261765, 554843765),  # Extended south (+50) rock
-        (551667365, 552502385),  # Extended south (+50) rock
-        (550290005, 551107805),  # Extended south (+50) rock
-        (547923665, 548557805),  # Extended south (+50) rock
-        (542869922, 546791705),  # Spacecraft operational anomaly, recovery,
-                                 # and extended south (+50) rock
-        (491961604, 492389764),  # ToO PSR J1119
-        (415063383, 415324023),  # Solar ToO
-        (407981463, 408414003),  # ToO Nova Cen
-        (258507868, 258671110),  # Non-science Unknown
-        }
+        DEG_TO_RAD = np.pi / 180
+        RAD_TO_DEG = 180 / np.pi
+
+        # Output of gtmktime from base analysis
+        events_file = os.path.join(outdir, "ft1_00.fits")
+        with fits.open(events_file) as events:
+            data = events[1].data
+            time_met = data.TIME
+            event_ra = data.RA * DEG_TO_RAD
+            event_dec = data.DEC * DEG_TO_RAD
+
+        with fits.open(fermipy_config['data']['scfile']) as spacecraft:
+            data = spacecraft[1].data
+            pointing_ra = data.RA_SCZ * DEG_TO_RAD
+            pointing_dec = data.DEC_SCZ * DEG_TO_RAD
+            edges = np.append(data.START, data.STOP[-1])
+
+        containdata = np.digitize(time_met, edges) - 1
+        pointing_ra = pointing_ra[containdata]
+        pointing_dec = pointing_dec[containdata]
+
+        def angular_distance(ra1, dec1, ra2, dec2):
+            distance = np.arccos(np.sin(dec1)*np.sin(dec2)
+                                 + np.cos(dec1)*np.cos(dec2)*np.cos(ra1 - ra2))
+            return distance
+
+        # Distance between the telescope pointing z-direction and each event
+        dist_events = RAD_TO_DEG * angular_distance(pointing_ra, pointing_dec,
+                                                    event_ra, event_dec)
+
+        time_met = time_met[dist_events < 50]
+        starts = time_met[:-1]
+        stops = time_met[1:]
+
+        min_bin_size = np.amin(times[1:] - times[:-1])
+        no_data = (stops - starts) > min_bin_size
+        no_data_periods = list(zip(starts[no_data], stops[no_data]))
+        return no_data_periods
+
+    if no_data_periods is None:
+        no_data_periods = get_no_data_periods()
 
     for period_start, period_end in no_data_periods:
-        # If there's only a few hours of data, the fit will likely fail
-        # Add a margin of error to avoid this
-        margin_of_error = 10800  # 3 hours
-        period_start -= margin_of_error
-        period_end += margin_of_error
         # Get the bins encompassed by each no-data period
         period_times = selected_times[(selected_times >= period_start)
                                       & (selected_times <= period_end)]
@@ -176,7 +197,7 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
     try:
         gta.lightcurve(fermipy_config['selection']['target'], make_plots=True)
     except (AttributeError, IOError, OSError, RuntimeError, TypeError,
-            VerifyError) as err:
+            fits.VerifyError) as err:
 
         if type(err) == RuntimeError:
             print(str(err))
@@ -215,7 +236,8 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0):
 
         # Restart the lightcurve analysis
         print("Restarting the lightcurve analysis...")
-        return run_lightcurve(original_config, prefix, num_sections, section)
+        return run_lightcurve(original_config, prefix, num_sections, section,
+                              no_data_periods)
 
     # Rename output file to prevent sections from overwriting each other
     if num_sections is not None:
