@@ -32,8 +32,11 @@ def run_analysis(fermipy_config, prefix, calculate_sed=True):
     gta.print_roi()
 
     # Remove undetected sources to simplify the model
-    gta.delete_sources(minmax_ts=[None, 4], exclude=['galdiff', 'isodiff'])
-    gta.delete_sources(minmax_npred=[None, 1], exclude=['galdiff', 'isodiff'])
+    custom_sources = fermipy_config.get('model', {}).get('sources', {})
+    exclude = [source['name'] for source in custom_sources]
+    exclude.extend(['galdiff', 'isodiff'])
+    gta.delete_sources(minmax_ts=[None, 4], exclude=exclude)
+    gta.delete_sources(minmax_npred=[None, 1], exclude=exclude)
 
     gta.print_roi()
 
