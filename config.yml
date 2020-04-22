@@ -21,6 +21,8 @@ selection:
 
 gtlike:
     edisp: true
+    edisp_disable: ['isodiff']
+    edisp_bins: -2
     irfs: 'P8R3_SOURCE_V2'
 
 lightcurve:
