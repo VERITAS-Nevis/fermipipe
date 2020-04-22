@@ -31,8 +31,8 @@ lightcurve:
 
 model:
     src_roiwidth: 30.0
-    galdiff: '$CONDA_PREFIX/share/fermitools/refdata/fermi/galdiffuse/gll_iem_v07.fits'
-    isodiff: 'iso_P8R3_SOURCE_V2_v1.txt'
+    galdiff: '$FERMI_DIR/refdata/fermi/galdiffuse/gll_iem_v07.fits'
+    isodiff: '$FERMI_DIR/refdata/fermi/galdiffuse/iso_P8R3_SOURCE_V2_v1.txt'
     catalogs: ['4FGL']
 
 optimizer:
