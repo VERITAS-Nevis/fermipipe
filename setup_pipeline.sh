@@ -27,7 +27,7 @@ then
 fi
 
 # Set up the conda environment manager
-bash $FERMIPIPE/Miniconda3-4.7.12.1-Linux-x86_64.sh -b -p $CONDA_DIR
+bash $FERMIPIPE/Miniconda3-latest-Linux-x86_64.sh -b -p $CONDA_DIR
 source $CONDA_DIR/bin/activate
 
 # Save the initialization text for other users to copy into their .bashrc
