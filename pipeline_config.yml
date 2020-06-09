@@ -1,9 +1,16 @@
 # Basic analysis parameters
 prefix: "3C279"
 fermipy_config: null  #  If null, default to <prefix>_config.yml
-multithread: false
-nthread: null
-calculate_sed: true
+delete_source: []  # Do not delete any specific sources
+delete_sources:  # Delete undetected sources
+    - {minmax_ts: [null, 4]}
+    - {minmax_npred: [null, 1]}
+free_source: # Free the galactic and isotropic diffuse components
+    - isodiff
+    - galdiff
+free_sources: # Free high TS sources and those close to the ROI center
+    - {minmax_ts: [25, null]}
+    - {distance: 5.0}
 
 # Lightcurve analysis parameters
 num_sections: null

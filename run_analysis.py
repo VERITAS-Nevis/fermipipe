@@ -11,15 +11,38 @@ import numpy as np
 import yaml
 
 
-def run_analysis(fermipy_config, prefix, calculate_sed=True):
+def run_analysis(fermipy_config, prefix,
+                 delete_source=None, delete_sources=None,
+                 free_source=None, free_sources=None):
     """
     Run a Fermipy analysis.
 
     Arguments:
         fermipy_config -- path to Fermipy config file
         prefix -- prefix for output files and output directory
+        delete_source --
+            list of names of sources to delete from the model
+        delete_sources --
+            list of dictionaries containing parameters
+            defining sources to delete from the model,
+            with isodiff, galdiff, and all custom sources
+            automatically excluded
+        free_source -- list of names of sources to free in the model fitting
+        free_sources --
+            list of dictionaries containing parameters
+            defining sources to free in the model fitting
     """
 
+    # Set default values
+    def default(arg):
+        return [] if arg is None else arg
+
+    delete_source = default(delete_source)
+    delete_sources = default(delete_sources)
+    free_source = default(free_source)
+    free_sources = default(free_sources)
+
+    # Prepare the analysis
     gta = GTAnalysis(fermipy_config, logging={'verbosity': 3})
 
     # Prepare the data and perform calculations needed for the analysis
@@ -31,22 +54,23 @@ def run_analysis(fermipy_config, prefix, calculate_sed=True):
 
     gta.print_roi()
 
-    # Remove undetected sources to simplify the model
+    # Remove sources to simplify the model
     custom_sources = fermipy_config.get('model', {}).get('sources', [])
     exclude = [source['name'] for source in custom_sources]
     exclude.extend(['galdiff', 'isodiff'])
-    gta.delete_sources(minmax_ts=[None, 4], exclude=exclude)
-    gta.delete_sources(minmax_npred=[None, 1], exclude=exclude)
+    for source in delete_source:
+        gta.delete_source(source)
+    for args in delete_sources:
+        args['exclude'] = exclude
+        gta.delete_sources(**args)
 
     gta.print_roi()
 
-    # Free high TS sources and those close to the ROI center
-    gta.free_sources(minmax_ts=[25, None])
-    gta.free_sources(distance=5.0)
-
-    # Free all parameters of the galactic and isotropic diffuse components
-    gta.free_source('galdiff')
-    gta.free_source('isodiff')
+    # Free the specified sources (all others fixed)
+    for source in free_source:
+        gta.free_source(source)
+    for args in free_sources:
+        gta.free_sources(**args)
 
     # Perform the model fit, and fix all sources again when done
     gta.fit()
@@ -64,8 +88,7 @@ def run_analysis(fermipy_config, prefix, calculate_sed=True):
     resmap = gta.residmap(prefix, model=model, make_plots=True)
 
     # Calculate the spectral energy distribution
-    if calculate_sed:
-        sed = gta.sed(fermipy_config['selection']['target'], make_plots=True)
+    sed = gta.sed(fermipy_config['selection']['target'], make_plots=True)
 
     # Save the results so they can be loaded later
     gta.write_roi(prefix, make_plots=True)
@@ -265,8 +288,6 @@ if __name__ == "__main__":
                         help="perform a lightcurve analysis")
     parser.add_argument('-s', '--section', type=int,
                         help="lightcurve section (overrides config)")
-    parser.add_argument('--no_sed', action='store_true',
-                        help="do not perform an SED analysis")
     args = parser.parse_args()
 
     with open(args.config, 'r') as config_file:
@@ -293,7 +314,8 @@ if __name__ == "__main__":
                    else pipeline_config['section'])
         run_lightcurve(fermipy_config, prefix, num_sections, section)
     else:
-        calculate_sed = (False if args.no_sed
-                         else pipeline_config.get('calculate_sed', True))
-        run_analysis(fermipy_config, prefix, calculate_sed=calculate_sed)
-
+        run_analysis(fermipy_config, prefix,
+                     delete_source=pipeline_config.get('delete_source'),
+                     delete_sources=pipeline_config.get('delete_sources'),
+                     free_source=pipeline_config.get('free_source'),
+                     free_sources=pipeline_config.get('free_sources'))
