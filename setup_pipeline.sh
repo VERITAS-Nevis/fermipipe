@@ -22,12 +22,15 @@ done
 
 if [[ $dry_run == 1 ]]
 then
-    echo "$FERMIPIPE/miniconda3.sh -b -p $CONDA_DIR"
+    echo "$PWD/Miniconda3-latest-Linux-x86_64.sh -b -p $CONDA_DIR"
     exit 0
 fi
 
 # Set up the conda environment manager
-bash $FERMIPIPE/Miniconda3-latest-Linux-x86_64.sh -b -p $CONDA_DIR
+wget "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+chmod +x Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -b -p $CONDA_DIR
+rm Miniconda3-latest-Linux-x86_64.sh
 source $CONDA_DIR/bin/activate
 
 # Save the initialization text for other users to copy into their .bashrc
