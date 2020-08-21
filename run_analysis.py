@@ -236,6 +236,7 @@ def run_lightcurve(fermipy_config, prefix, num_sections=None, section=0,
                 "Could not open FITS extension",
                 "Failed to converge after",
                 "File not found",
+                "mage in extension",
                 ]
             allowed_start = False
             for start in allowed_runtime_error_starts:
